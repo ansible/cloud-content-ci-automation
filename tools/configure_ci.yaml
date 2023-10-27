@@ -1,0 +1,14 @@
+---
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - files/input_files.yaml
+    - files/config.yaml
+  tasks:
+    - name: Load YAML file
+      ansible.builtin.include_tasks: tasks/load_files.yaml
+      vars:
+        input_file: "{{ collection_path }}/{{ fn }}"
+      loop: "{{ workflow_files }}"
+      loop_control:
+        loop_var: fn

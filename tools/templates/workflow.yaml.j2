@@ -1,0 +1,37 @@
+---
+{% if data.name is defined %}
+name: {{ data.name }}
+{% endif %}
+
+{% if data.true is defined %}
+on: {{ data.true | to_nice_yaml }}
+{% endif %}
+
+{% for job_key, job_data in data.jobs.items() %}
+jobs:
+  {{ job_key }}:
+    uses: {{ job_data.uses }}
+    with:
+      {% if job_data.with.matrix_include is defined %}
+      matrix_include: {{ job_data.with.matrix_include }}
+      {% endif %}
+      {% if job_data.with.matrix_exclude is defined %}
+      matrix_exclude: >-
+        [
+{% set matrix_exclude = job_data.with.matrix_exclude | from_yaml | default([]) %}
+{% for item in matrix_exclude %}
+          {
+            "ansible-version": "{{ item['ansible-version'] }}"{% if item['python-version'] is defined %},
+            "python-version": "{{ item['python-version'] }}"
+          {% else %}
+
+          {% endif %}
+          }{% if not loop.last %},
+          {% else %}
+
+    {% endif %}
+  {% endfor %}
+        ]
+  {% endif %}
+{% endfor %}
+

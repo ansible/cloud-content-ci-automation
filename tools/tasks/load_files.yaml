@@ -1,0 +1,19 @@
+---
+- name: Load YAML file
+  ansible.builtin.set_fact:
+    data: "{{ lookup('file', input_file) | from_yaml }}"
+
+- name: Manipulate matrix parameter
+  ansible.builtin.include_tasks: manipulate_matrix_param.yaml
+  when: config_items[0].parameter in ["matrix_include", "matrix_exclude"]
+  loop: "{{ config | product(job_names) | list }}"
+  loop_control:
+    loop_var: config_items
+
+- name: Convert Python dictionary to YAML and write to the input file
+  ansible.builtin.template:
+    src: workflow.yaml.j2
+    dest: "{{ input_file }}"
+    lstrip_blocks: true
+  vars:
+    data: "{{ data | string }}"

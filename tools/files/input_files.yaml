@@ -1,0 +1,6 @@
+---
+collection_path: /home/gosriniv/github/collections/ansible_collections/
+workflow_files:
+  - amazon/aws/.github/workflows/sanity.yml
+job_names:
+  - sanity
