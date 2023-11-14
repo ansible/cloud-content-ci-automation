@@ -6,7 +6,7 @@
     - files/config.yaml
   tasks:
     - name: Load YAML file
-      ansible.builtin.include_tasks: tasks/load_files.yaml
+      ansible.builtin.include_tasks: tasks/main.yaml
       vars:
         input_file: "{{ collection_path }}/{{ fn }}"
       loop: "{{ workflow_files }}"

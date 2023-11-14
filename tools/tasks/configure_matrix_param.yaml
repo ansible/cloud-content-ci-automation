@@ -9,7 +9,7 @@
   ignore_errors: true
 
 - name: Create matrix list dynamically for remove action
-  ansible.builtin.include_tasks: remove_item.yaml
+  ansible.builtin.include_tasks: remove_matrix_entry.yaml
   vars:
     to_remove: "{{ config_items[0].value }}"
     present_value: "{{ data.jobs[config_items[1]].with[config_items[0].parameter] | from_yaml }}"
