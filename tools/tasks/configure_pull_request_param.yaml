@@ -1,0 +1,31 @@
+---
+- name: Create structured on dictionary
+  set_fact:
+    modify_params: |
+      {
+        "{{ config_items[0].parameter }}": {{ config_items[0].value | to_json | from_json }}
+      }
+  when:
+    - config_items[0].action == "add"
+    - config_items[0].parameter in data.on
+  ignore_errors: true
+
+- name: Add to existing dict
+  set_fact:
+    add_config:
+      "on": "{{ data.on | combine(modify_params) }}"
+  when:
+    - config_items[0].action == "add"
+    - config_items[0].parameter in data.on
+  ignore_errors: true
+
+- name: Update data with structured on dictionary
+  set_fact:
+    data: "{{ data | combine(add_config, recursive=true) }}"
+  when:
+    - config_items[0].action == "add"
+    - config_items[0].parameter in data.on
+  ignore_errors: true
+
+- debug:
+    var: data

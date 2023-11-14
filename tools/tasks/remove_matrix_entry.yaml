@@ -1,0 +1,6 @@
+---
+- name: Remove values from matrix list
+  ansible.builtin.set_fact:
+    modify_param_value: "{{ modify_param_value | default([]) + [item] }}"
+  when: item not in to_remove
+  loop: "{{ present_value }}"
