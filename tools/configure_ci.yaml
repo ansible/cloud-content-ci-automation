@@ -2,17 +2,7 @@
 - hosts: localhost
   gather_facts: false
   vars_files:
-    - files/input_files.yaml
-    - files/config.yaml
+    - vars/main.yaml
   tasks:
-    - name: Set branch name
-      ansible.builtin.set_fact:
-        branch_name: "edit_gha_{{ ansible.builtin.date('%Y-%m-%d_%H-%M-%S') }}"
-
-    - name: Load YAML file
+    - name: Add GHA workflows
       ansible.builtin.include_tasks: tasks/main.yaml
-      vars:
-        input_file: "{{ collection_path }}/{{ fn }}"
-      loop: "{{ workflow_files }}"
-      loop_control:
-        loop_var: fn

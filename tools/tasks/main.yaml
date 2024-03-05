@@ -1,39 +1,6 @@
 ---
-- name: Get directory from file path
-  ansible.builtin.command: dirname input_file
-  register: directory
-
-- name: Prepare git branch
-  ansible.builtin.shell: 
-- name: Load YAML file
-  ansible.builtin.set_fact:
-    data: "{{ lookup('file', input_file) | regex_replace('on:', '\"on\":') | from_yaml }}"
-
-- name: Manipulate matrix parameter
-  ansible.builtin.include_tasks: configure_matrix_param.yaml
-  when: config_items[0].parameter in ["matrix_include", "matrix_exclude"]
-  loop: "{{ config | product(job_names) | list }}"
+- name: Scaffold github workflows
+  ansible.builtin.include_tasks: render_workflow.yaml
+  loop: "{{ collections }}"
   loop_control:
-    loop_var: config_items
-
-- name: Change uses parameter
-  ansible.builtin.include_tasks: configure_job_uses_param.yaml
-  when: config_items[0].parameter == "uses"
-  loop: "{{ config | product(job_names) | list }}"
-  loop_control:
-    loop_var: config_items
-
-- name: Change pull_request parameter
-  ansible.builtin.include_tasks: configure_pull_request_param.yaml
-  when: config_items[0].parameter == "pull_request"
-  loop: "{{ config | product(job_names) | list }}"
-  loop_control:
-    loop_var: config_items
-
-- name: Convert Python dictionary to YAML and write to the workflow file
-  ansible.builtin.template:
-    src: workflow.yaml.j2
-    dest: "{{ input_file }}"
-    lstrip_blocks: true
-  vars:
-    data: "{{ data | string }}"
+    loop_var: name
