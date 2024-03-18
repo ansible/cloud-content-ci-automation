@@ -1,7 +1,7 @@
 # GitHub Workflows Setup for Cloud Collections
 
 ## Overview
-GitHub Action Workflows are extensively used for Continuous Integration (CI) testing in cloud collections. Detailed information about the tests, supported Python, and Ansible versions can be found in the [CI documentation](https://github.com/ansible-collections/cloud-content-handbook/tree/main/CI) and the [collections' repository](https://github.com/ansible-collections/amazon.aws/blob/main/CI.md).
+GitHub Action Workflows are extensively used for Continuous Integration (CI) testing in cloud collections. Detailed information about the tests can be found in the [CI documentation](https://github.com/ansible-collections/cloud-content-handbook/tree/main/CI). Supported Python and Ansible versions can be found in the [collections' CI documentation](https://github.com/ansible-collections/amazon.aws/blob/main/CI.md).
 
 ## CI Configuration Tool
 The CI Configuration Tool is designed to scaffold common GitHub Action workflows in various cloud collection repositories. This tool serves as a centralized location to make modifications to workflows, such as changing workflow calls or test versions, ensuring consistency across all collection repositories.
@@ -15,7 +15,7 @@ The CI Configuration Tool is designed to scaffold common GitHub Action workflows
 
 **2.** Provide the collection root path and the collections to which the GitHub workflow needs to be added in the [vars file](https://github.com/ansible/cloud-content-ci-automation/blob/main/tools/vars/main.yaml).
 
-**3.** To make changes to the workflows, edit the [templates](https://github.com/ansible/cloud-content-ci-automation/blob/main/tools/templates). Submit a pull request (PR) in your fork for review.
+**3.** To make changes to the workflows, edit the [workflow files](https://github.com/ansible/cloud-content-ci-automation/blob/main/tools/files). Submit a pull request (PR) in your fork for review.
 
 **4.** To edit or add GitHub workflows to the collections, ensure the collections are on their latest main branch. Run the [configure_ci](https://github.com/ansible/cloud-content-ci-automation/blob/main/tools/configure_ci.yaml) playbook as follows
    ```
