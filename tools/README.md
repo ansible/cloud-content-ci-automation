@@ -22,6 +22,11 @@ The CI Configuration Tool is designed to scaffold common GitHub Action workflows
    ansible-playbook configure_ci.yaml
    ```
 
+To specify a particular version of ansible-lint, you can supply the version as an argument as below. The default value is configured to 'v.21.0'.
+
+   ```
+   ansible-playbook configure_ci.yaml -e "ansible_lint_version=v6.22.0"
+   ```
    This action creates a branch in the repositories listed in the [vars file](https://github.com/ansible/cloud-content-ci-automation/blob/main/tools/vars/main.yaml) and adds `tests.yml` and `linters.yml` workflows to the `.github/workflows` directory of the collections.
 
 **5.** Navigate to the local version of your collection repository and review the changes made by the tool. Add and commit the changes. Create a PR with these changes in the collections upstream repository and submit the PRs for review.

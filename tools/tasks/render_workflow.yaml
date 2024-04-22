@@ -13,12 +13,15 @@
     path: "{{ collection_dir }}/.github/workflows"
     state: directory
 
-- name: Copy the tests.yml template to the collection's gh workflow
+- debug:
+    var: ansible_lint_version
+
+- name: Copy the tests.yml to the collection's gh workflow
   ansible.builtin.copy:
     src: files/tests.yml
     dest: '{{ collection_dir + "/.github/workflows/tests.yml" }}'
 
 - name: Copy the linters.yml template to the collection's gh workflow
-  ansible.builtin.copy:
-    src: files/linters.yml
+  ansible.builtin.template:
+    src: linters.yml.j2
     dest: '{{ collection_dir + "/.github/workflows/linters.yml" }}'
