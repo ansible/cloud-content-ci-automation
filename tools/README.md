@@ -22,7 +22,7 @@ The CI Configuration Tool is designed to scaffold common GitHub Action workflows
    ansible-playbook configure_ci.yaml
    ```
 
-To specify a particular version of ansible-lint, you can supply the version as an argument as below. The default value is configured to 'v.21.0'.
+To specify a particular version of ansible-lint, you can supply the version as an argument as below. The default value is configured to 'v6.21.0'.
 
    ```
    ansible-playbook configure_ci.yaml -e "ansible_lint_version=v6.22.0"

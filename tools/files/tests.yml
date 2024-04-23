@@ -13,8 +13,6 @@ on: # yamllint disable-line rule:truthy
 jobs:
   linters:
     uses: ./.github/workflows/linters.yml # use the callable linters job to run tests
-  ansible-lint:
-    uses: ansible/ansible-content-actions/.github/workflows/ansible_lint.yaml@main
   changelog:
     uses: ansible/ansible-content-actions/.github/workflows/changelog.yaml@main
     if: github.event_name == 'pull_request'
@@ -27,7 +25,6 @@ jobs:
     if: ${{ always() }}
     needs:
       - linters
-      - ansible-lint
       - changelog
       - sanity
       - units
@@ -38,7 +35,6 @@ jobs:
           set([
           '${{ needs.linters.result }}',
           '${{ needs.changelog.result }}',
-          '${{ needs.ansible-lint.result }}'
           '${{ needs.sanity.result }}',
           '${{ needs.units.result }}'
           ])"
