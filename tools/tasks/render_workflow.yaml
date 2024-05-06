@@ -13,8 +13,10 @@
     path: "{{ collection_dir }}/.github/workflows"
     state: directory
 
-- debug:
-    var: ansible_lint_version
+- name: Copy the tox-ansible.ini to the collection path
+  ansible.builtin.copy:
+    src: files/tox-ansible.ini
+    dest: '{{ collection_dir + "tox-ansible.ini" }}'
 
 - name: Copy the tests.yml to the collection's gh workflow
   ansible.builtin.copy:

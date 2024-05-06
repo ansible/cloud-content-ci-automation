@@ -4,7 +4,7 @@
 GitHub Action Workflows are extensively used for Continuous Integration (CI) testing in cloud collections. Detailed information about the tests can be found in the [CI documentation](https://github.com/ansible-collections/cloud-content-handbook/tree/main/CI). Supported Python and Ansible versions can be found in the [collections' CI documentation](https://github.com/ansible-collections/amazon.aws/blob/main/CI.md).
 
 ## CI Configuration Tool
-The CI Configuration Tool is designed to scaffold common GitHub Action workflows in various cloud collection repositories. This tool serves as a centralized location to make modifications to workflows, such as changing workflow calls or test versions, ensuring consistency across all collection repositories.
+The CI Configuration Tool is designed to scaffold common GitHub Action workflows and tox-ansible configuration file in various cloud collection repositories. This tool serves as a centralized location to make modifications to workflows, such as changing workflow calls or test versions, ensuring consistency across all collection repositories.
 
 ## Usage
 
