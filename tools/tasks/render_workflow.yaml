@@ -1,0 +1,29 @@
+---
+- name: Set fact for collection path
+  ansible.builtin.set_fact:
+    collection_dir: "{{ collection_path + name }}"
+
+- name: Create a Git branch
+  ansible.builtin.command:
+    cmd: "git checkout -b gh_fix_{{ now(fmt='%m%d_%H%M%S') }}"
+    chdir: "{{ collection_dir }}"
+
+- name: Create .github/workflows if it is not present
+  ansible.builtin.file:
+    path: "{{ collection_dir }}/.github/workflows"
+    state: directory
+
+- name: Copy the tox-ansible.ini to the collection path
+  ansible.builtin.copy:
+    src: files/tox-ansible.ini
+    dest: '{{ collection_dir + "tox-ansible.ini" }}'
+
+- name: Copy the tests.yml to the collection's gh workflow
+  ansible.builtin.copy:
+    src: files/tests.yml
+    dest: '{{ collection_dir + "/.github/workflows/tests.yml" }}'
+
+- name: Copy the linters.yml template to the collection's gh workflow
+  ansible.builtin.template:
+    src: linters.yml.j2
+    dest: '{{ collection_dir + "/.github/workflows/linters.yml" }}'

@@ -1,0 +1,6 @@
+---
+- name: Scaffold github workflows
+  ansible.builtin.include_tasks: render_workflow.yaml
+  loop: "{{ collections }}"
+  loop_control:
+    loop_var: name
