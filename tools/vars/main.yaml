@@ -1,5 +1,5 @@
 ---
-collection_path: /your/local/collection/path/
+collection_path: /home/gosriniv/github/collections/ansible_collections/
 collections:
   - amazon/aws
   - cloud/aws_ops
