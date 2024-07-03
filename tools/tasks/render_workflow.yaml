@@ -27,3 +27,15 @@
   ansible.builtin.template:
     src: linters.yml.j2
     dest: '{{ collection_dir + "/.github/workflows/linters.yml" }}'
+
+- name: Set fact for collection name in dotted notation
+  ansible.builtin.set_fact:
+    collection_name: "{{ name | replace('/', '.') }}"
+
+- name: Copy the release workflow templates to the collection's gh workflow
+  ansible.builtin.template:
+    src: "{{ item + '.j2'}}" 
+    dest: '{{ collection_dir + "/.github/workflows/" + item }}'
+  loop:
+    - release-manual.yml
+    - release-tag.yml
