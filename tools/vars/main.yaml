@@ -3,4 +3,4 @@ collection_path: /your/local/collection/path/
 collections:
   - amazon/aws
   - cloud/aws_ops
-ansible_lint_version: "v6.22.1"
+ansible_lint_version: "v24.7.0"
