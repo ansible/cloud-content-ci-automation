@@ -13,15 +13,7 @@ if [ -n "$CONTAINER_CMD" ]; then
   echo "Building with $CONTAINER_CMD (Python 3.14, linux/arm64) for Lambda..."
   # --platform linux/arm64: build for Lambda Arm64
   if ! $CONTAINER_CMD run --rm --platform linux/arm64 --entrypoint bash -v "$(pwd)":/out -w /out public.ecr.aws/lambda/python:3.14 \
-    -c 'pip install -r requirements.txt -t package && python3 -c "
-import zipfile, os
-with zipfile.ZipFile(\"deploy.zip\", \"w\", zipfile.ZIP_DEFLATED) as zf:
-    for root, _, files in os.walk(\"package\"):
-        for f in files:
-            path = os.path.join(root, f)
-            zf.write(path, os.path.relpath(path, \"package\"))
-    zf.write(\"handler.py\", \"handler.py\")
-"'; then
+    -c 'pip install -r requirements.txt -t package && python3 create_deployment_zip.py'; then
     if [ "$CONTAINER_CMD" = podman ]; then
       echo "Tip: On macOS, ensure the Podman VM is running: podman machine start"
     fi

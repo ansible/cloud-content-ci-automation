@@ -28,8 +28,7 @@ CLOUD_REPOS = [
     "redhat-cop/cloud.aws_troubleshooting",
     "redhat-cop/cloud.gcp_ops",
     "redhat-cop/cloud.terraform_ops",
-    "ansible/terraform-provider-aap",
-    "ansible/terraform-provider-ansible",
+    "ansible-collections/ansible.mcp",
 ]
 
 dod_title = "Definition of Done"
