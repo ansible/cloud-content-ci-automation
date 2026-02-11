@@ -1,0 +1,6 @@
+# Lambda deployment: install into a directory and zip with handler.py
+# Build for Lambda Python 3.14, Arm64. Set Lambda runtime to Python 3.14 and Architecture to arm64.
+jira>=3.5.0
+PyGithub>=2.1.0
+cffi>=1.15.0
+# boto3 is provided by Lambda runtime
