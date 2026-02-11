@@ -138,3 +138,8 @@ dmypy.json
 # Lambda deployment build artifacts
 deploy.zip
 **/lambda/package/
+
+# Ansible
+*.retry
+vars.yml
+response.json
