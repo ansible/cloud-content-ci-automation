@@ -8,15 +8,12 @@ Simple Ansible playbook to deploy a Lambda function that syncs GitHub issues to 
 |------|---------|
 | **`deploy.yml`** | Main Ansible playbook - deploys Lambda + EventBridge schedule |
 | **`requirements.yml`** | Ansible collections needed (amazon.aws, community.aws) |
-| **`inventory.yml`** | Tells Ansible to run on localhost |
-| **`ansible.cfg`** | Ansible configuration (output format, etc.) |
-| **`vars.example.yml`** | Optional: Copy to `vars.yml` to customize settings |
 
 ## What It Does
 
 When you run `deploy.yml`, it:
 
-1. **Builds Lambda Package** - Runs `../lambda/build-lambda.sh` if deploy.zip doesn't exist
+1. **Builds Lambda Package** - Runs `../lambda/build-lambda.sh` to create the deployment package
 2. **Creates IAM Role** - With permissions to read Secrets Manager and write CloudWatch Logs
 3. **Deploys Lambda Function** - Python 3.14 on ARM64 architecture
 4. **Sets Up EventBridge Schedule** - Runs Lambda daily at 8 AM and 1 PM EST.
@@ -59,7 +56,7 @@ ansible-playbook deploy.yml -e secret_name=cloud_team_jira_login
 
 That's it! This deploys everything:
 - Lambda function
-- EventBridge schedule (runs daily at 10 AM UTC)
+- EventBridge schedule (runs twice daily at 8 AM and 1 PM EST)
 - IAM roles and policies
 - CloudWatch Logs
 
@@ -80,9 +77,9 @@ ansible-playbook deploy.yml \
 |----------|---------|-------------|
 | `secret_name` | (required) | AWS Secrets Manager secret name |
 | `aws_region` | `us-east-2` | AWS region to deploy to |
-| `lambda_timeout` | `300` | Function timeout in seconds (max 900) |
+| `lambda_timeout` | `120` | Function timeout in seconds (max 900) |
 | `lambda_memory` | `256` | Memory in MB (128-10240) |
-| `schedule_expression` | `cron(0 10 * * ? *)` | When to run (daily at 10 AM UTC) |
+| `schedule_expression` | `cron(0 13,18 * * ? *)` | When to run (8 AM and 1 PM EST daily) |
 
 ### Schedule Expression Examples
 
@@ -124,15 +121,15 @@ aws logs tail /aws/lambda/github-to-jira-utility --region us-east-2 --since 1h
 ### Check EventBridge Schedule
 
 ```bash
-aws events describe-rule --name github-jira-utility-daily-run --region us-east-2
+aws scheduler get-schedule --name github-jira-utility-daily-run --region us-east-2
 ```
 
 ## What Gets Created in AWS
 
 - **Lambda Function**: `github-to-jira-utility`
-- **IAM Role**: `github-to-jira-utility-role`
-- **IAM Policy**: `github-to-jira-utility-role-secrets-policy`
-- **EventBridge Rule**: `github-jira-utility-daily-run`
+- **IAM Role**: `github-to-jira-utility-role` (with inline policies: `read-secret-<secret_name>`, `invoke-lambda-github-to-jira-utility`, `cloudwatch-logs-github-to-jira-utility`)
+- **IAM Role**: `eventbridge-scheduler-role` (for EventBridge Scheduler to invoke Lambda)
+- **EventBridge Schedule**: `github-jira-utility-daily-run` (EventBridge Scheduler, not a rule)
 - **CloudWatch Log Group**: `/aws/lambda/github-to-jira-utility`
 
 

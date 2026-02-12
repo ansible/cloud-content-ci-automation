@@ -52,6 +52,7 @@ Step-by-step instructions for building and deploying the Lambda function manuall
     ├── handler.py       # Function handler
     ├── requirements.txt # Python dependencies
     ├── build-lambda.sh  # Build script
+    ├── create_deployment_zip.py  # Used by build script to create deploy.zip
     └── README.md        # Manual deployment guide
 ```
 
