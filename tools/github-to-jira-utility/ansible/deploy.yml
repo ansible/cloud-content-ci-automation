@@ -18,8 +18,6 @@
     schedule_name: "github-jira-utility-daily-run"
     schedule_expression: "cron(0 13,18 * * ? *)"  # Runs at 8:00 AM and 1:00 PM EST daily
     deployment_package: "{{ playbook_dir }}/../lambda/deploy.zip"
-    # Required variable
-    secret_name: ""
 
   tasks:
     - name: Validate required variables
@@ -96,48 +94,30 @@
         state: present
       register: lambda_role
 
-    - name: Create inline policy for Secrets Manager access
+    - name: Create inline policies for Lambda role
       amazon.aws.iam_policy:
         iam_type: role
         iam_name: "{{ iam_role_name }}"
-        policy_name: "read-secret-{{ secret_name }}"
+        policy_name: "{{ item.policy_name }}"
         region: "{{ aws_region }}"
-        policy_json:
-          Version: '2012-10-17'
-          Statement:
+        state: present
+        policy_json: "{{ {'Version': '2012-10-17', 'Statement': item.statement} | to_json }}"
+      loop:
+        - policy_name: "read-secret-{{ secret_name }}"
+          statement:
             - Effect: Allow
               Action:
                 - secretsmanager:GetSecretValue
               Resource:
                 - "arn:aws:secretsmanager:{{ aws_region }}:{{ aws_caller_info.account }}:secret:{{ secret_name }}*"
-        state: present
-      register: secrets_policy
-
-    - name: Create inline policy for Lambda invocation
-      amazon.aws.iam_policy:
-        iam_type: role
-        iam_name: "{{ iam_role_name }}"
-        policy_name: "invoke-lambda-{{ lambda_function_name }}"
-        region: "{{ aws_region }}"
-        policy_json:
-          Version: '2012-10-17'
-          Statement:
+        - policy_name: "invoke-lambda-{{ lambda_function_name }}"
+          statement:
             - Effect: Allow
               Action: lambda:InvokeFunction
               Resource:
                 - "arn:aws:lambda:{{ aws_region }}:{{ aws_caller_info.account }}:function:{{ lambda_function_name }}"
-        state: present
-      register: invoke_policy
-
-    - name: Create inline policy for CloudWatch Logs
-      amazon.aws.iam_policy:
-        iam_type: role
-        iam_name: "{{ iam_role_name }}"
-        policy_name: "cloudwatch-logs-{{ lambda_function_name }}"
-        region: "{{ aws_region }}"
-        policy_json:
-          Version: '2012-10-17'
-          Statement:
+        - policy_name: "cloudwatch-logs-{{ lambda_function_name }}"
+          statement:
             - Effect: Allow
               Action: logs:CreateLogGroup
               Resource:
@@ -148,8 +128,6 @@
                 - logs:PutLogEvents
               Resource:
                 - "arn:aws:logs:{{ aws_region }}:{{ aws_caller_info.account }}:log-group:/aws/lambda/{{ lambda_function_name }}:*"
-        state: present
-      register: logs_policy
 
     - name: Wait for IAM role propagation
       ansible.builtin.pause:
