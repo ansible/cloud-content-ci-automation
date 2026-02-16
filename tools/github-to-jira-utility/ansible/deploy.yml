@@ -1,0 +1,258 @@
+---
+# Ansible playbook to deploy the GitHub-to-Jira utility as an AWS Lambda function
+
+- name: Deploy GitHub-to-Jira Lambda Function
+  hosts: localhost
+  gather_facts: false
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-2', true) }}"
+    required_aws_cli_version: "2.9.0"
+    lambda_function_name: "github-to-jira-utility"
+    lambda_handler: handler.lambda_handler
+    lambda_runtime: python3.14
+    lambda_architecture: arm64
+    lambda_timeout: 120
+    lambda_memory: 256
+    lambda_description: "Syncs GitHub issues with 'jira' label to ACA Jira project"
+    iam_role_name: "github-to-jira-utility-role"
+    schedule_name: "github-jira-utility-daily-run"
+    schedule_expression: "cron(0 13,18 * * ? *)"  # Runs at 8:00 AM and 1:00 PM EST daily
+    deployment_package: "{{ playbook_dir }}/../lambda/deploy.zip"
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - secret_name is defined
+          - secret_name | length > 0
+        fail_msg: "ERROR: secret_name is required. Use: -e secret_name=your_secret_name"
+
+    - name: Check AWS CLI version
+      ansible.builtin.command:
+        cmd: aws --version
+      register: aws_cli_version_output
+      changed_when: false
+      failed_when: false
+
+    - name: Parse AWS CLI version
+      ansible.builtin.set_fact:
+        aws_cli_version: "{{ aws_cli_version_output.stdout | regex_search('aws-cli/([0-9]+\\.[0-9]+\\.[0-9]+)', '\\1') | first }}"
+      when: aws_cli_version_output.rc == 0
+
+    - name: Verify AWS CLI version meets minimum requirement
+      ansible.builtin.assert:
+        that:
+          - aws_cli_version_output.rc == 0
+          - aws_cli_version is defined
+          - aws_cli_version is version(required_aws_cli_version, '>=')
+        fail_msg: |
+          ERROR: AWS CLI version {{ required_aws_cli_version }} or higher is required for EventBridge Scheduler support.
+          Current version: {{ aws_cli_version | default('not found') }}
+
+          To upgrade AWS CLI on macOS:
+            curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+            sudo installer -pkg AWSCLIV2.pkg -target /
+            rm AWSCLIV2.pkg
+
+          Or using Homebrew:
+            brew install awscli
+
+          After upgrading, verify with: aws --version
+        success_msg: "AWS CLI version {{ aws_cli_version }} meets the requirement (>= {{ required_aws_cli_version }})"
+
+    - name: Build Lambda deployment package
+      ansible.builtin.shell:
+        cmd: ./build-lambda.sh
+        chdir: "{{ playbook_dir }}/../lambda"
+      register: build_result
+      changed_when: true
+
+    - name: Verify deployment package was created
+      ansible.builtin.stat:
+        path: "{{ deployment_package }}"
+      register: deploy_zip_stat
+      failed_when: not deploy_zip_stat.stat.exists
+
+    - name: Get AWS account ID
+      amazon.aws.aws_caller_info:
+      register: aws_caller_info
+
+    - name: Create IAM role for Lambda
+      amazon.aws.iam_role:
+        name: "{{ iam_role_name }}"
+        region: "{{ aws_region }}"
+        assume_role_policy_document:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        managed_policy:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        create_instance_profile: false
+        state: present
+      register: lambda_role
+
+    - name: Create inline policies for Lambda role
+      amazon.aws.iam_policy:
+        iam_type: role
+        iam_name: "{{ iam_role_name }}"
+        policy_name: "{{ item.policy_name }}"
+        region: "{{ aws_region }}"
+        state: present
+        policy_json: "{{ {'Version': '2012-10-17', 'Statement': item.statement} | to_json }}"
+      loop:
+        - policy_name: "read-secret-{{ secret_name }}"
+          statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - "arn:aws:secretsmanager:{{ aws_region }}:{{ aws_caller_info.account }}:secret:{{ secret_name }}*"
+        - policy_name: "invoke-lambda-{{ lambda_function_name }}"
+          statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource:
+                - "arn:aws:lambda:{{ aws_region }}:{{ aws_caller_info.account }}:function:{{ lambda_function_name }}"
+        - policy_name: "cloudwatch-logs-{{ lambda_function_name }}"
+          statement:
+            - Effect: Allow
+              Action: logs:CreateLogGroup
+              Resource:
+                - "arn:aws:logs:{{ aws_region }}:{{ aws_caller_info.account }}:*"
+            - Effect: Allow
+              Action:
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource:
+                - "arn:aws:logs:{{ aws_region }}:{{ aws_caller_info.account }}:log-group:/aws/lambda/{{ lambda_function_name }}:*"
+
+    - name: Wait for IAM role propagation
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Deploy Lambda function
+      amazon.aws.lambda:
+        name: "{{ lambda_function_name }}"
+        region: "{{ aws_region }}"
+        state: present
+        runtime: "{{ lambda_runtime }}"
+        handler: "{{ lambda_handler }}"
+        role: "{{ lambda_role.iam_role.arn }}"
+        zip_file: "{{ deployment_package }}"
+        architecture: "{{ lambda_architecture }}"
+        timeout: "{{ lambda_timeout }}"
+        memory_size: "{{ lambda_memory }}"
+        description: "{{ lambda_description }}"
+        environment_variables:
+          GITHUB_JIRA_SECRET_ID: "{{ secret_name }}"
+        tags:
+          Application: github-to-jira-utility
+          ManagedBy: ansible
+      register: lambda_function
+
+    - name: Create CloudWatch Logs group
+      community.aws.cloudwatchlogs_log_group:
+        log_group_name: "/aws/lambda/{{ lambda_function_name }}"
+        region: "{{ aws_region }}"
+        retention: 7
+        state: present
+
+    - name: Create IAM role for EventBridge Scheduler
+      amazon.aws.iam_role:
+        name: "eventbridge-scheduler-role"
+        region: "{{ aws_region }}"
+        assume_role_policy_document:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: scheduler.amazonaws.com
+              Action: sts:AssumeRole
+        create_instance_profile: false
+        state: present
+      register: scheduler_role
+
+    - name: Create inline policy for EventBridge Scheduler to invoke Lambda
+      amazon.aws.iam_policy:
+        iam_type: role
+        iam_name: "eventbridge-scheduler-role"
+        policy_name: "invoke-lambda-{{ lambda_function_name }}"
+        region: "{{ aws_region }}"
+        policy_json:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: lambda:InvokeFunction
+              Resource: "{{ lambda_function.configuration.function_arn }}"
+        state: present
+
+    - name: Wait for EventBridge Scheduler IAM role propagation
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Create EventBridge Schedule (modern scheduler)
+      ansible.builtin.command:
+        cmd: >
+          aws scheduler create-schedule
+          --name "{{ schedule_name }}"
+          --schedule-expression "{{ schedule_expression }}"
+          --flexible-time-window Mode=OFF
+          --target '{
+            "Arn": "{{ lambda_function.configuration.function_arn }}",
+            "RoleArn": "{{ scheduler_role.iam_role.arn }}"
+          }'
+          --description "Daily scheduled run of GitHub-to-Jira utility Lambda"
+          --region "{{ aws_region }}"
+      register: schedule_create
+      failed_when:
+        - schedule_create.rc != 0
+        - '"ConflictException" not in schedule_create.stderr'
+      changed_when: schedule_create.rc == 0
+
+    - name: Update EventBridge Schedule if it already exists
+      ansible.builtin.command:
+        cmd: >
+          aws scheduler update-schedule
+          --name "{{ schedule_name }}"
+          --schedule-expression "{{ schedule_expression }}"
+          --flexible-time-window Mode=OFF
+          --target '{
+            "Arn": "{{ lambda_function.configuration.function_arn }}",
+            "RoleArn": "{{ scheduler_role.iam_role.arn }}"
+          }'
+          --description "Daily scheduled run of GitHub-to-Jira utility Lambda"
+          --region "{{ aws_region }}"
+      when: '"ConflictException" in schedule_create.stderr'
+      changed_when: true
+
+    - name: Display deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================="
+          - "   Deployment Complete!"
+          - "=========================================="
+          - ""
+          - "Lambda Function:"
+          - "  Name: {{ lambda_function_name }}"
+          - "  ARN: {{ lambda_function.configuration.function_arn }}"
+          - "  Region: {{ aws_region }}"
+          - ""
+          - "EventBridge Schedule:"
+          - "  Name: {{ schedule_name }}"
+          - "  Expression: {{ schedule_expression }}"
+          - "  Type: EventBridge Scheduler (modern)"
+          - "  Status: ENABLED"
+          - ""
+          - "View schedule:"
+          - "  aws scheduler get-schedule --name {{ schedule_name }} --region {{ aws_region }}"
+          - ""
+          - "Test the function:"
+          - "  aws lambda invoke --function-name {{ lambda_function_name }} --region {{ aws_region }} --payload '{}' response.json"
+          - ""
+          - "View logs:"
+          - "  aws logs tail /aws/lambda/{{ lambda_function_name }} --region {{ aws_region }} --follow"
+          - ""
+          - "=========================================="

@@ -1,12 +1,14 @@
-# GitHub → Jira Lambda
+# GitHub → Jira Lambda - Manual Deployment
 
 Syncs GitHub issues labeled `jira` to ACA Jira. The function scans a fixed set of cloud-content repositories for issues with the `jira` label, checks which ones do not yet have a corresponding ACA issue (by matching the GitHub URL in existing Jira issue descriptions), and for each creates an ACA Bug with summary, description, labels, and components (e.g. cloud-content, Public Cloud / Container Native by repo). New issues are then transitioned to Backlog.
+
+This guide covers manual deployment using AWS CLI or Console. For automated deployment with Ansible, see **[../ansible/README.md](../ansible/README.md)**.
+
+## Configuration
 
 | Runtime   | Architecture |
 |----------|--------------|
 | Python 3.14 | arm64       |
-
-## Configuration
 
 The function runs in the cloud team AWS account with the following in place:
 
@@ -19,7 +21,9 @@ The function runs in the cloud team AWS account with the following in place:
 | **Secrets Manager** | Secret `cloud_team_jira_login` (Jira + GitHub credentials) |
 | **Environment** | `GITHUB_JIRA_SECRET_ID` set to the secret name or ARN for config lookup |
 
-## How to run
+---
+
+## Deployment Steps
 
 ### 1. Build the deployment package (Python 3.14, arm64)
 
