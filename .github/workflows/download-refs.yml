@@ -1,0 +1,60 @@
+name: Download PR refs artifacts
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the artifact to download.
+        type: string
+        default: 'base-ref'
+    outputs:
+      content:
+        description: The content of the reference file.
+        value: ${{ jobs.download.outputs.result }}
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.read-artifact.outputs.file_content }}
+    steps:
+      - name: Download Artifact
+        uses: actions/github-script@v7
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          WORKSPACE: ${{ github.workspace }}
+        with:
+          script: |
+            const { RUN_ID, ARTIFACT_NAME, WORKSPACE } = process.env;
+
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: Number(RUN_ID), // Convert string env to Number
+            });
+
+            const matchArtifact = artifacts.data.artifacts.find(
+              (artifact) => artifact.name === ARTIFACT_NAME
+            );
+
+            if (!matchArtifact) {
+              throw new Error(`Artifact not found: ${ARTIFACT_NAME}`);
+            }
+
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: matchArtifact.id,
+              archive_format: 'zip',
+            });
+
+            const fs = require('fs');
+            fs.writeFileSync(`${WORKSPACE}/ref.zip`, Buffer.from(download.data));
+
+      - name: Unzip downloaded artifact
+        id: read-artifact
+        run: |
+          unzip ref.zip -d .
+          # Read file and remove any trailing newlines
+          CONTENT=$(cat base-ref.txt | tr -d '\n')
+          echo "file_content=$CONTENT" >> $GITHUB_OUTPUT
