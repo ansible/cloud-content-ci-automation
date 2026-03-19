@@ -10,7 +10,7 @@ inputs:
     required: true
   all_targets:
     description: |
-      The raw json data produces by the ansible_test_splitter action with
+      The raw json data produced by the ansible_test_splitter action with
       the list of targets.
       (example: '{"integration-amazon.aws-1": "ec2_key", "integration-amazon.aws-2": "ec2_instance"}'
     required: true
