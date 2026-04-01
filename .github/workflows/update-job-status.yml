@@ -35,7 +35,7 @@ jobs:
             let name = process.env.job_name;
             const descriptions = {
               'success': `Successful in ${diff_minutes}m ${remainder}s`,
-              'failure': 'Worfklow run failed, see logs for details',
+              'failure': 'Workflow run failed, see logs for details',
               'skipped': 'Integration tests skipped, no changed test targets identified',
               'cancelled': 'Workflow run cancelled',
               'error': 'Unexpected result, see logs for details',
