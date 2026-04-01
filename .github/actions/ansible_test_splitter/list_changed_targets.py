@@ -130,7 +130,7 @@ def build_import_tree(collection_path, collection_name, collections_names):
                     utils_import[utils].append(i)
                     if i not in visited:
                         utils_to_visit.append(i)
-        except:
+        except Exception:
             pass
     return modules_import, utils_import, inventories_import
 
