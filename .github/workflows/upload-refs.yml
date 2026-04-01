@@ -1,0 +1,25 @@
+name: Upload PR refs artifacts
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: The name of the artifact to upload.
+        type: string
+        default: 'base-ref'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Write PR base ref to file
+        run: |
+          mkdir -p ./pr
+          echo "${{ github.event.pull_request.base.ref }}" > ./pr/base-ref.txt
+
+      - name: Upload file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ inputs.artifact_name }}"
+          path: ./pr/base-ref.txt
+          retention-days: 1

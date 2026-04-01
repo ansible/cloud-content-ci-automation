@@ -1,0 +1,45 @@
+name: Read ansible-test targets
+description: |
+  Read ansible-test targets for the job id. The action parses the output of
+  the ansible_test_splitter and retrieve the targets for the specific job.
+
+inputs:
+  job_id:
+    description: |
+      The job identifier (example: 'integration-amazon.aws-1')
+    required: true
+  all_targets:
+    description: |
+      The raw json data produced by the ansible_test_splitter action with
+      the list of targets.
+      (example: '{"integration-amazon.aws-1": "ec2_key", "integration-amazon.aws-2": "ec2_instance"}'
+    required: true
+outputs:
+  job_targets:
+    description: The corresponding targets to be executed by the job.
+    value: ${{ steps.parse-targets.outputs.job_targets }}
+
+runs:
+  using: composite
+  steps:
+    - name: Parse ansible_test_splitter result and retrieve job
+      id: parse-targets
+      uses: actions/github-script@v7
+      env:
+        TEST_TARGETS: '${{ inputs.all_targets }}'
+        JOB_ID: '${{ inputs.job_id }}'
+      with:
+        script: |
+          const TEST_TARGETS = process.env.TEST_TARGETS;
+          const JOB_ID = process.env.JOB_ID;
+
+          try {
+            const data = JSON.parse(TEST_TARGETS);
+            if (!(JOB_ID in data)){
+              core.setFailed(`Critical Error: The JSON data is missing the required key: '${JOB_ID}'`);
+            } else {
+              core.setOutput("job_targets", data[JOB_ID]);
+            }
+          } catch (error) {
+            core.setFailed(`Invalid JSON string: ${error.message}`);
+          }

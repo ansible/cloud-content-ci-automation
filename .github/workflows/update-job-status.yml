@@ -1,0 +1,67 @@
+name: Update job status
+on:
+  workflow_call:
+    inputs:
+      job_name:
+        type: string
+        required: true
+        description: The name of the Job to update.
+      job_result:
+        description: The result of the job execution, if not provided the Job status should be set to 'pending'.
+        type: string
+        default: ''
+
+jobs:
+  commit-job-status:
+    name: Update Job status
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    env:
+      job_name: '${{ inputs.job_name }}'
+      job_result: '${{ inputs.job_result }}'
+    steps:
+      - name: Commit workflow job status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const started = new Date(run.run_started_at);
+            const now = new Date();
+            const diff_seconds = Math.floor((now - started) / 1000);
+            const diff_minutes = Math.floor(diff_seconds / 60);
+            const remainder = diff_seconds % 60;
+            let conclusion = process.env.job_result;
+            let name = process.env.job_name;
+            const descriptions = {
+              'success': `Successful in ${diff_minutes}m ${remainder}s`,
+              'failure': 'Workflow run failed, see logs for details',
+              'skipped': 'Integration tests skipped, no changed test targets identified',
+              'cancelled': 'Workflow run cancelled',
+              'error': 'Unexpected result, see logs for details',
+              'pending': 'This check has started...'
+            };
+            if (conclusion == '') {
+              status = 'pending';
+              conclusion = 'pending';
+            } else if (['success', 'skipped'].includes(conclusion)) {
+              status = 'success';
+            } else if (['cancelled', 'failure'].includes(conclusion)) {
+              status = 'failure';
+            } else {
+              conclusion = 'error';
+              status = 'failure';
+            };
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const target_url = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const args = {
+              owner: owner,
+              repo: repo,
+              sha: run.head_sha,
+              state: status,
+              target_url: run.html_url,
+              context: name,
+              description: descriptions[conclusion]
+            };
+            const result = await github.rest.repos.createCommitStatus(args);

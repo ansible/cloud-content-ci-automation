@@ -1,0 +1,86 @@
+name: Cloud integration test splitter
+description: Evaluate which targets need to be tested.
+
+inputs:
+  collections_to_test:
+    description: |
+      Path to the collections to test.
+      Provide as a comma-separated list of collection path and base ref to test against.
+      e.g: '~/runner/.ansible/collections/ansible_collections/amazon/aws,~/runner/.ansible/collections/ansible_collections/community/aws'
+    required: true
+  total_jobs:
+    description: The total number of jobs to share targets on
+    required: false
+    default: "3"
+  base_ref:
+    description: The git base branch to compare with.
+    required: true
+outputs:
+  jobs:
+    description: The list of jobs to be executed
+    value: ${{ steps.list-targets.outputs.jobs }}
+  targets:
+    description: The detailed targets for each job
+    value: ${{ steps.list-targets.outputs.targets }}
+
+runs:
+  using: composite
+  steps:
+    - name: setup python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.12"
+
+    - name: Install python required libraries
+      run: pip install -U pyyaml
+      shell: bash
+
+    - name: Check if pull request contains label 'test-all-the-targets' to trigger all the targets
+      id: define-options
+      uses: actions/github-script@v6
+      with:
+        script: |
+          let prNumber;
+
+          // Scenario 1: Direct Pull Request trigger
+          if (context.payload.pull_request) {
+            prNumber = context.payload.pull_request.number;
+            console.log(`Direct PR trigger. PR #${prNumber}`);
+          } 
+          // Scenario 2: Indirect Workflow Run trigger
+          else if (context.payload.workflow_run) {
+            // A workflow_run can be associated with multiple PRs; we take the first
+            prNumber = context.payload.workflow_run.pull_requests[0]?.number;
+            console.log(`Workflow Run trigger. Found associated PR #${prNumber}`);
+          }
+
+          if (!prNumber) {
+            core.setFailed("Could not find an associated Pull Request for this run.");
+            return;
+          }
+
+          // Fetch full PR details (this ensures we have the latest labels)
+          const { data: pullRequest } = await github.rest.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: prNumber,
+          });
+
+          const labelNames = pullRequest.labels.map(l => l.name);
+          console.log(`Active Labels: ${labelNames.join(', ')}`);
+
+          let hasTestAllTheTargetsLabel = "false"
+          if (labelNames.includes('test-all-the-targets')) {
+            hasTestAllTheTargetsLabel = "true";
+          }
+          core.setOutput("test_all_the_targets", hasTestAllTheTargetsLabel);
+
+    - name: Run the test splitter
+      id: list-targets
+      run: python3 ${{ github.action_path }}/list_changed_targets.py
+      shell: bash
+      env:
+        SPLITTER_BASE_REF: '${{ inputs.base_ref }}'
+        SPLITTER_NUMBER_JOBS: '${{ inputs.total_jobs }}'
+        SPLITTER_COLLECTIONS_TO_TEST: '${{ inputs.collections_to_test }}'
+        SPLITTER_TEST_ALL_THE_TARGETS: '${{ steps.define-options.outputs.test_all_the_targets }}'
