@@ -89,7 +89,7 @@ jobs:
 
           galaxy_long_version = galaxy_version._long_version('-')
           if str(galaxy_long_version) != str(config.get('version')):
-            config.get('version') = galaxy_long_version
+            config['version'] = galaxy_long_version
             with open(galaxy_path, 'w') as fp:
                 yaml.dump(config, fp)
 
