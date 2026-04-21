@@ -18,10 +18,12 @@ jobs:
     steps:
       - name: Parse String to JSON
         id: set-matrix
+        env:
+          collections_paths: "${{ inputs.required_collections }}"
         uses: actions/github-script@v7
         with:
           script: |
-            const raw = "${{ github.event.inputs.required_collections }}"; 
+            const raw = process.env.collections_paths; 
             const repoObjects = raw.split(',')
               .map(item => {
                 const [name, ref] = item.trim().split(':');
