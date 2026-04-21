@@ -70,6 +70,8 @@ jobs:
 
       - name: Generate Version Info
         shell: python
+        env:
+          COLLECTION_PATH: "${{ env.collection_path }}"
         run: |
           import os
           import pbr.version
@@ -79,13 +81,14 @@ jobs:
           yaml.explicit_start = True
           yaml.indent(sequence=4, offset=2)
 
-          galaxy_path = os.path.join(os.path.expanduser(path), 'galaxy.yml')
+          collection_path = os.getenv('COLLECTION_PATH')
+          galaxy_path = os.path.join(os.path.expanduser(collection_path), 'galaxy.yml')
           config = yaml.load(open(galaxy_path))
           try:
               galaxy_version = str(config.get('version')).replace("-", ".")
               galaxy_version = pbr.version.SemanticVersion.from_pip_string(galaxy_version)
           except (ValueError, TypeError):
-              raise KeyError(f"Galaxy version error for collection path {path!r}")
+              raise KeyError(f"Galaxy version error for collection path {collection_path!r}")
 
           galaxy_long_version = galaxy_version._long_version('-')
           if str(galaxy_long_version) != str(config.get('version')):
