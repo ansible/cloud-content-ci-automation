@@ -9,10 +9,6 @@ on:
           When no referene is defined, the process will checkout the default version.
           e.g. github.com/ansible-collections/amazon.aws:stable-4,github.com/ansible-collections/ansible.utils.
         type: string
-      ref:
-        description: The reference to checkout.
-        type: string
-        default: ${{ github.base_ref }}
 
 jobs:
   setup-matrix:
