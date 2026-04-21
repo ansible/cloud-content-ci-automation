@@ -58,10 +58,40 @@ jobs:
           ref: ${{ matrix.repo.ref }}
           path: ${{ env.collection_path }}
 
-      - name: Generate ansible collection
-        uses: ./.github/actions/generate_ansible_collection
+      - name: Setup python
+        uses: actions/setup-python@v4
         with:
-          collection_path: '${{ env.collection_path }}'
+          python-version: "3.12"
+      
+      - name: Install python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible-core ruamel.yaml pbr
+
+      - name: Generate Version Info
+        shell: python
+        run: |
+          import os
+          import pbr.version
+          from ruamel.yaml import YAML
+
+          yaml = YAML()
+          yaml.explicit_start = True
+          yaml.indent(sequence=4, offset=2)
+
+          galaxy_path = os.path.join(os.path.expanduser(path), 'galaxy.yml')
+          config = yaml.load(open(galaxy_path))
+          try:
+              galaxy_version = str(config.get('version')).replace("-", ".")
+              galaxy_version = pbr.version.SemanticVersion.from_pip_string(galaxy_version)
+          except (ValueError, TypeError):
+              raise KeyError(f"Galaxy version error for collection path {path!r}")
+
+          galaxy_long_version = galaxy_version._long_version('-')
+          if str(galaxy_long_version) != str(config.get('version')):
+            config.get('version') = galaxy_long_version
+            with open(galaxy_path, 'w') as fp:
+                yaml.dump(config, fp)
 
       - name: Build Collection
         run: ansible-galaxy collection build ${{ env.collection_path }} --output-path ./tarballs
