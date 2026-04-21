@@ -1,0 +1,70 @@
+name: Build Collection
+
+on:
+  workflow_call:
+    inputs:
+      required_collections:
+        description: |
+          The comma-separated list of collections to build with an optional reference to checkout.
+          When no referene is defined, the process will checkout the default version.
+          e.g. github.com/ansible-collections/amazon.aws:stable-4,github.com/ansible-collections/ansible.utils.
+        type: string
+      ref:
+        description: The reference to checkout.
+        type: string
+        default: ${{ github.base_ref }}
+
+jobs:
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix_repos: ${{ steps.set-matrix.outputs.repos }}
+    steps:
+      - name: Parse String to JSON
+        id: set-matrix
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const raw = "${{ github.event.inputs.required_collections }}"; 
+            const repoObjects = raw.split(',')
+              .map(item => {
+                const [name, ref] = item.trim().split(':');
+                return { 
+                  name: name, 
+                  ref: ref || '' // If no colon, ref is empty string (default branch)
+                };
+              })
+              .filter(item => item.name.length > 0);
+            
+            core.setOutput('repos', JSON.stringify(repoObjects));
+
+  build-collection:
+    needs: setup-matrix
+    runs-on: ubuntu-latest
+    env:
+      collection_path: "./collection"
+    strategy:
+      matrix:
+        repo: ${{ fromJSON(needs.setup-matrix.outputs.matrix_repos) }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repo.name }}
+          ref: ${{ matrix.repo.ref }}
+          path: ${{ env.collection_path }}
+
+      - name: Generate ansible collection
+        uses: ./.github/actions/generate_ansible_collection
+        with:
+          collection_path: '${{ env.collection_path }}'
+
+      - name: Build Collection
+        run: ansible-galaxy collection build ${{ env.collection_path }} --output-path ./tarballs
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          # Use the repo name in the artifact name to avoid overwriting
+          name: tarball-${{ strategy.job-index }}
+          path: ./tarballs/*.tar.gz
