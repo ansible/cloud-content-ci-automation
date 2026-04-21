@@ -34,6 +34,12 @@ jobs:
             
             core.setOutput('repos', JSON.stringify(repoObjects));
 
+      - name: Display output
+        run: |
+          echo "Repositories: $REPOS"
+        env:
+          REPOS: '${{ steps.set-matrix.outputs.repos }}'
+
   build-collection:
     needs: setup-matrix
     runs-on: ubuntu-latest
