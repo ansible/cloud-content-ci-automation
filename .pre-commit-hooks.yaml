@@ -1,0 +1,8 @@
+-   id: block-ide-ai-files
+    name: block ai and ide files
+    description: ensure no .vscode or .claude files are staged.
+    entry: pre_commit_hooks/block-ide-files.sh
+    language: script
+    pass_filenames: true
+    stages: [pre-commit, pre-push, manual]
+    minimum_pre_commit_version: 3.2.0
