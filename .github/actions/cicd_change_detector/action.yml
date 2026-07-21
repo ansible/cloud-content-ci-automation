@@ -1,0 +1,166 @@
+---
+name: CI/CD Change Detector
+description: |
+  Detects when a PR modifies CI/CD configuration files and flags them
+  for enhanced security review by adding a label and posting a review
+  checklist comment.
+
+inputs:
+  github-token:
+    description: >
+      GitHub token with permissions to add labels and post comments.
+      Typically secrets.GITHUB_TOKEN.
+    required: true
+  label-name:
+    description: 'Label to add when CI/CD files are detected'
+    required: false
+    default: 'ci-cd-change'
+
+outputs:
+  ci-cd-files-changed:
+    description: "true if CI/CD files were detected, false otherwise"
+    value: ${{ steps.detect.outputs.changed }}
+  changed-file-count:
+    description: "Number of CI/CD files changed"
+    value: ${{ steps.detect.outputs.count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect CI/CD changes and apply label and checklist
+      id: detect
+      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        LABEL_NAME: ${{ inputs.label-name }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const prNumber = parseInt(process.env.PR_NUMBER, 10);
+          core.setOutput('changed', 'false');
+          core.setOutput('count', '0');
+          if (!prNumber || isNaN(prNumber)) {
+            core.info('Not a pull_request event or PR number not found. Skipping.');
+            return;
+          }
+
+          const files = await github.paginate(
+            github.rest.pulls.listFiles,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            }
+          );
+
+          const isCiCdFile = (filename) => {
+            if (filename.startsWith('.github/workflows/') &&
+                (filename.endsWith('.yml') || filename.endsWith('.yaml'))) {
+              return true;
+            }
+            if (filename.startsWith('.github/actions/')) return true;
+            if (filename.match(/^(Makefile|makefile|GNUmakefile)$/)) return true;
+            if (filename === 'tox.ini') return true;
+            if (filename === 'noxfile.py') return true;
+            if (filename === '.zuul.yaml') return true;
+            if (filename.startsWith('.zuul.d/')) return true;
+            return false;
+          };
+
+          const ciCdFiles = files
+            .map(f => f.filename)
+            .filter(isCiCdFile);
+
+          if (ciCdFiles.length === 0) {
+            core.info('No CI/CD configuration files changed.');
+            core.setOutput('changed', 'false');
+            core.setOutput('count', '0');
+            return;
+          }
+          core.setOutput('changed', 'true');
+          core.setOutput('count', ciCdFiles.length.toString());
+
+          core.info(`CI/CD files changed: ${ciCdFiles.join(', ')}`);
+
+          const labelName = process.env.LABEL_NAME;
+          try {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: [labelName],
+            });
+            core.info(`Label '${labelName}' added to PR #${prNumber}.`);
+          } catch (error) {
+            if (error.status === 422 || error.status === 404) {
+              core.info(`Label '${labelName}' not found in repo. Creating it.`);
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: labelName,
+                color: 'e11d48',
+                description: 'PR modifies CI/CD configuration files',
+              });
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: [labelName],
+              });
+              core.info(`Label '${labelName}' created and added to PR #${prNumber}.`);
+            } else {
+              core.setFailed(`Failed to add label: ${error.message}`);
+              throw error;
+            }
+          }
+
+          const marker = '<!-- cicd-change-detector-checklist -->';
+          const comments = await github.paginate(
+            github.rest.issues.listComments,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            }
+          );
+
+          const existingComment = comments.find(c => c.body && c.body.includes(marker));
+          if (existingComment) {
+            core.info('Checklist comment already exists. Skipping.');
+            return;
+          }
+
+          const fileList = ciCdFiles.map(f => `- \`${f}\``).join('\n');
+          const body = [
+            marker,
+            '## :shield: CI/CD Configuration Change Detected',
+            '',
+            'This PR modifies CI/CD configuration files that may have elevated privileges.',
+            'Please ensure the following security review checklist is completed before merging.',
+            '',
+            '### Changed CI/CD files',
+            `**${ciCdFiles.length} files require security review:**`,
+            '',
+            fileList,
+            '',
+            '### Security Review Checklist',
+            '',
+            '- [ ] **Secrets handling**: No secrets, tokens, or credentials are hardcoded or logged',
+            '- [ ] **Permission scope**: Workflow permissions follow least privilege (`permissions:` block is present and scoped)',
+            '- [ ] **Third-party actions**: New or updated actions are pinned to a full commit SHA, not a mutable tag',
+            '- [ ] **Script injection**: `run:` steps do not use unsanitized `${{ }}` expressions that could enable injection',
+            '- [ ] **Artifact safety**: Uploaded/downloaded artifacts do not contain sensitive data',
+            '- [ ] **Environment protection**: Production environments have required reviewers configured',
+            '- [ ] **Test coverage**: Changes to test config (tox.ini, noxfile.py) do not reduce coverage or skip critical tests',
+            '- [ ] **Reviewer approval**: A second reviewer with CI/CD expertise has reviewed these changes',
+          ].join('\n');
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            body: body,
+          });
+          core.info('Security review checklist comment posted.');
